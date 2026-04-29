@@ -1,0 +1,5 @@
+flask
+ultralytics
+opencv-contrib-python
+imagezmq
+numpy
