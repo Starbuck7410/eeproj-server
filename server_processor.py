@@ -7,7 +7,7 @@ import threading
 import time
 
 app = Flask(__name__)
-model = YOLO('yolov8n.pt')
+model = YOLO('yolov8s-world.pt')
 
 # AprilTag Detector
 aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_APRILTAG_36h11)
@@ -25,7 +25,7 @@ CONFIDENCE_THRESHOLD = 0.5  # Only show objects with > 50% confidence
 def process_stream():
     global output_frame
     image_hub = imagezmq.ImageHub()
-    
+    model.set_classes(["cube", "can", "bottle"])
     while True:
         rpi_name, jpg_buffer = image_hub.recv_jpg()
         image_hub.send_reply(b'OK')
@@ -41,7 +41,7 @@ def process_stream():
 
         # --- YOLO WITH CONFIDENCE FILTER ---
         # conf=0.5 filters results at the model level for better performance
-        results = model(frame, stream=True, conf=CONFIDENCE_THRESHOLD, verbose=False, device='cpu')
+        results = model.predict(frame, stream=True, conf=CONFIDENCE_THRESHOLD, verbose=False, device=0)
         
         for r in results:
             frame = r.plot() # Annotates the frame with filtered boxes
@@ -69,11 +69,17 @@ def generate():
 
 @app.route("/")
 def index():
-    return render_template_string('<h1>Vision Feed</h1><img src="/video_feed" width="640">')
+    return render_template_string('<h1>Vision Feed</h1><img src="/video_feed" width="1080">')
 
 @app.route("/video_feed")
 def video_feed():
     return Response(generate(), mimetype="multipart/x-mixed-replace; boundary=frame")
+
+@app.route("/api/garbage")
+def garbage():
+    x = 10
+    y = 10
+    return render_template_string(f'{{"x": {x}, "y": {y}}}')
 
 if __name__ == "__main__":
     # Move processing to a daemon thread so it doesn't block the main Flask thread
