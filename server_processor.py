@@ -89,11 +89,22 @@ def garbage():
     y = -0.8
     z = 0
     target = {
-    "x": x,
-    "y": y,
-    "z": z
-}
+        "x": x,
+        "y": y,
+        "z": z
+    }
+    return jsonify(target)
 
+@app.route("/api/basket")
+def basket():
+    x = -1.0
+    y = 0.8
+    z = 0
+    target = {
+        "x": x,
+        "y": y,
+        "z": z
+    }
     return jsonify(target)
 
 if __name__ == "__main__":
