@@ -1,75 +1,83 @@
 import cv2
 import imagezmq
 import numpy as np
-from flask import Flask, Response, render_template_string
+from flask import Flask, Response, render_template, jsonify
 from ultralytics import YOLO
 import threading
 import time
 
 app = Flask(__name__)
+
+# Load YOLO-World
 model = YOLO('yolov8s-world.pt')
+TARGET_CLASSES = ["cube", "can", "bottle"]
+model.set_classes(TARGET_CLASSES)
 
 # AprilTag Detector
 aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_APRILTAG_36h11)
 aruco_params = cv2.aruco.DetectorParameters()
 detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
 
-# Global storage
+# Global state
 output_frame = None
+latest_stats = {cls: 0 for cls in TARGET_CLASSES}
+latest_stats["fps"] = 0
 lock = threading.Lock()
 
-# --- CONFIGURATION ---
-CONFIDENCE_THRESHOLD = 0.5  # Only show objects with > 50% confidence
-# ---------------------
-
 def process_stream():
-    global output_frame
+    global output_frame, latest_stats
     image_hub = imagezmq.ImageHub()
-    model.set_classes(["cube", "can", "bottle"])
+    prev_time = time.time()
+
     while True:
         rpi_name, jpg_buffer = image_hub.recv_jpg()
         image_hub.send_reply(b'OK')
 
-        # Decode JPEG
         frame = cv2.imdecode(np.frombuffer(jpg_buffer, dtype=np.uint8), cv2.IMREAD_COLOR)
         if frame is None:
             continue
 
-        # --- FIX COLORS ---
-        # If the Pi sends RGB and OpenCV treats it as BGR, swap them here
-        # frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR) # Uncomment if colors are inverted
-
-        # --- YOLO WITH CONFIDENCE FILTER ---
-        # conf=0.5 filters results at the model level for better performance
-        results = model.predict(frame, stream=True, conf=CONFIDENCE_THRESHOLD, verbose=False, device=0)
+        # Inference
+        results = model.predict(frame, stream=True, conf=0.5, verbose=False)
         
+        current_counts = {cls: 0 for cls in TARGET_CLASSES}
         for r in results:
-            frame = r.plot() # Annotates the frame with filtered boxes
+            frame = r.plot()
+            for box in r.boxes:
+                cls_id = int(box.cls[0])
+                label = r.names[cls_id]
+                if label in current_counts:
+                    current_counts[label] += 1
 
-        # --- AprilTag Logic ---
+        # AprilTags
         corners, ids, _ = detector.detectMarkers(frame)
         if ids is not None:
             cv2.aruco.drawDetectedMarkers(frame, corners, ids)
 
+        # FPS calculation
+        curr_time = time.time()
+        fps = 1 / (curr_time - prev_time)
+        prev_time = curr_time
+
         with lock:
-            # When encoding for the web, ensure it's in BGR so browsers read it as RGB
-            _, encoded_image = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+            latest_stats.update(current_counts)
+            latest_stats["fps"] = round(fps, 1)
+            _, encoded_image = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
             output_frame = encoded_image.tobytes()
 
 def generate():
     while True:
-        # Avoid high-frequency polling when no frame is ready
-        time.sleep(0.01) 
+        time.sleep(0.01)
         with lock:
             if output_frame is None:
                 continue
             frame_to_send = output_frame
-        
         yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + frame_to_send + b'\r\n')
 
 @app.route("/")
 def index():
-    return render_template_string('<h1>Vision Feed</h1><img src="/video_feed" width="1080">')
+    # Flask looks in the /templates folder for index.html
+    return render_template('index.html')
 
 @app.route("/video_feed")
 def video_feed():
@@ -77,14 +85,18 @@ def video_feed():
 
 @app.route("/api/garbage")
 def garbage():
-    x = 10
-    y = 10
-    return render_template_string(f'{{"x": {x}, "y": {y}}}')
+    x = 1.0
+    y = -0.8
+    z = 0
+    target = {
+    "x": x,
+    "y": y,
+    "z": z
+}
+
+    return jsonify(target)
 
 if __name__ == "__main__":
-    # Move processing to a daemon thread so it doesn't block the main Flask thread
     process_thread = threading.Thread(target=process_stream, daemon=True)
     process_thread.start()
-    
-    # Run Flask with 'threaded=True' to allow concurrent web requests
-    app.run(host='0.0.0.0', port=5000, threaded=True, debug=False)
+    app.run(host='0.0.0.0', port=4999, threaded=True, debug=False)
