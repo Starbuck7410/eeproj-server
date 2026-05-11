@@ -11,34 +11,67 @@
         .video-card { border: none; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         .stat-card { border: none; border-radius: 12px; background: #1a1d2b; transition: transform 0.2s; }
         .stat-card:hover { transform: translateY(-5px); }
-        .status-indicator { width: 12px; height: 12px; border-radius: 50%; display: inline-block; background: #00ff88; margin-right: 8px; box-shadow: 0 0 10px #00ff88; }
+        .status-indicator { width: 12px; height: 12px; border-radius: 50%; display: inline-block; background: #ec1e1e; margin-right: 8px; box-shadow: 0 0 10px #ec1e1e; }
         .navbar { background: #161925 !important; border-bottom: 1px solid #2d3142; }
     </style>
     <script>
-    async function updateFps() {
+
+    async function updateStats() {
         try {
             const response = await fetch('/api/frame_stats');
             const data = await response.json();
-
             document.getElementById('fps-val').textContent = data.fps;
+            document.getElementById('resolution-val').textContent = data.resolution;
+            document.getElementById('status-indicator-text').textContent = data.online ? "SYSTEM ONLINE" : "SYSTEM OFFLINE";
+
+            indicator = document.getElementById('status-indicator-ping');
+
+            if (data.online) {
+                indicator.style.background = "#00ff88";
+                indicator.style.boxShadow = "0 0 10px #00ff88";
+            } else {
+                indicator.style.background = "#ec1e1e";
+                indicator.style.boxShadow = "0 0 10px #ec1e1e";
+            }
+
         } catch (error) {
-            console.error('Failed to fetch FPS:', error);
+            console.error('Failed to fetch stats:', error);
+        }
+
+
+        try {
+            const response = await fetch('/api/garbage');
+            const data = await response.json();
+            document.getElementById('garbage-x').textContent = data.x;
+            document.getElementById('garbage-y').textContent = data.y;
+        } catch (error) {
+            console.error('Failed to fetch garbage location:', error);
+        }
+
+
+        try {
+            const response = await fetch('/api/basket');
+            const data = await response.json();
+            document.getElementById('basket-x').textContent = data.x;
+            document.getElementById('basket-y').textContent = data.y;
+        } catch (error) {
+            console.error('Failed to fetch basket location:', error);
         }
     }
 
     // Update immediately
-    updateFps();
+    updateStats();
 
     // Update every second
-    setInterval(updateFps, 1000);
+    setInterval(updateStats, 1000);
     </script>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark px-4">
         <a class="navbar-brand fw-bold" href="#">VISION <span class="text-primary">CORE</span></a>
         <div class="ms-auto d-flex align-items-center">
-            <span class="status-indicator"></span>
-            <span class="text-muted small">SYSTEM ONLINE</span>
+            <span class="status-indicator" id="status-indicator-ping"></span>
+            <span class="text-muted small" id="status-indicator-text">SYSTEM OFFLINE</span>
         </div>
     </nav>
 
@@ -56,6 +89,34 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <span class="h4 mb-0" id="fps-val">0</span>
                         <span class="badge bg-secondary">FPS</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="h4 mb-0" id="resolution-val">0</span>
+                        <span class="badge bg-secondary">Resolution</span>
+                    </div>
+                </div>
+                
+                <div class="card stat-card p-3 mb-3">
+                    <h6 class="text-uppercase text-muted small fw-bold mb-3">Garbage Location</h6>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="h4 mb-0" id="garbage-x">0</span>
+                        <span class="badge bg-secondary">x (Meters)</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="h4 mb-0" id="garbage-y">0</span>
+                        <span class="badge bg-secondary">y (Meters)</span>
+                    </div>
+                </div>
+
+                <div class="card stat-card p-3 mb-3">
+                    <h6 class="text-uppercase text-muted small fw-bold mb-3">Basket Location</h6>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="h4 mb-0" id="basket-x">0</span>
+                        <span class="badge bg-secondary">x (Meters)</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="h4 mb-0" id="basket-y">0</span>
+                        <span class="badge bg-secondary">y (Meters)</span>
                     </div>
                 </div>
 
