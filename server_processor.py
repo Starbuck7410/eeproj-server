@@ -5,13 +5,12 @@ from flask import Flask, Response, render_template, jsonify
 from ultralytics import YOLO
 import threading
 import time
+from processing import detect_colored_balls
 
 app = Flask(__name__)
 
 # Load YOLO-World
-model = YOLO('yolov8s-world.pt')
-TARGET_CLASSES = ["cube", "can", "bottle"]
-model.set_classes(TARGET_CLASSES)
+model = YOLO('yolov8s.pt')
 
 # AprilTag Detector
 aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_APRILTAG_36h11)
@@ -20,12 +19,11 @@ detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
 
 # Global state
 output_frame = None
-latest_stats = {cls: 0 for cls in TARGET_CLASSES}
-latest_stats["fps"] = 0
 lock = threading.Lock()
+fps = 0
 
 def process_stream():
-    global output_frame, latest_stats
+    global output_frame, fps
     image_hub = imagezmq.ImageHub()
     prev_time = time.time()
 
@@ -38,30 +36,21 @@ def process_stream():
             continue
 
         # Inference
-        results = model.predict(frame, stream=True, conf=0.5, verbose=False)
-        
-        current_counts = {cls: 0 for cls in TARGET_CLASSES}
-        for r in results:
-            frame = r.plot()
-            for box in r.boxes:
-                cls_id = int(box.cls[0])
-                label = r.names[cls_id]
-                if label in current_counts:
-                    current_counts[label] += 1
+        # results = model(frame, stream=True, verbose=False, device = '0' )
+        # for r in results:
+        #     frame = r.plot() # Draws YOLO boxes
+        detections, frame = detect_colored_balls(frame)
 
         # AprilTags
-        corners, ids, _ = detector.detectMarkers(frame)
-        if ids is not None:
-            cv2.aruco.drawDetectedMarkers(frame, corners, ids)
-
+        corners, ids, rejected = detector.detectMarkers(frame)
+        
+        
         # FPS calculation
         curr_time = time.time()
-        fps = 1 / (curr_time - prev_time)
+        fps = round(1 / (curr_time - prev_time), 1)
         prev_time = curr_time
 
         with lock:
-            latest_stats.update(current_counts)
-            latest_stats["fps"] = round(fps, 1)
             _, encoded_image = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
             output_frame = encoded_image.tobytes()
 
@@ -104,6 +93,13 @@ def basket():
         "x": x,
         "y": y,
         "z": z
+    }
+    return jsonify
+
+@app.route("/api/frame_stats")
+def frame_stats():
+    target = {
+        "fps": fps
     }
     return jsonify(target)
 

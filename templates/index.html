@@ -14,6 +14,24 @@
         .status-indicator { width: 12px; height: 12px; border-radius: 50%; display: inline-block; background: #00ff88; margin-right: 8px; box-shadow: 0 0 10px #00ff88; }
         .navbar { background: #161925 !important; border-bottom: 1px solid #2d3142; }
     </style>
+    <script>
+    async function updateFps() {
+        try {
+            const response = await fetch('/api/frame_stats');
+            const data = await response.json();
+
+            document.getElementById('fps-val').textContent = data.fps;
+        } catch (error) {
+            console.error('Failed to fetch FPS:', error);
+        }
+    }
+
+    // Update immediately
+    updateFps();
+
+    // Update every second
+    setInterval(updateFps, 1000);
+    </script>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark px-4">
