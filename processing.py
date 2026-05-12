@@ -4,7 +4,7 @@ import numpy as np
 import cv2
 import numpy as np
 
-TAG_SIZE_MM = 250
+TAG_SIZE_MM = 26.2
 
 def detect_colored_balls(frame):
 
@@ -20,12 +20,14 @@ def detect_colored_balls(frame):
 
     # Simplified color ranges for lookup
     color_ranges = {
-        "green":  [(np.array([35, 50, 50]), np.array([85, 255, 255]))],
-        "blue":   [(np.array([90, 50, 50]), np.array([130, 255, 255]))],
-        "purple": [(np.array([130, 50, 50]), np.array([160, 255, 255]))],
-        "orange": [(np.array([10, 100, 100]), np.array([25, 255, 255]))],
         "red":    [(np.array([0, 50, 50]), np.array([10, 255, 255])),
-                   (np.array([170, 50, 50]), np.array([180, 255, 255]))]
+                   (np.array([150, 50, 50]), np.array([180, 255, 255]))],
+        "orange": [(np.array([10, 70, 70]), np.array([20, 255, 255]))],
+        "yellow": [(np.array([20, 50, 50]), np.array([40, 255, 255]))],
+        "green":  [(np.array([40, 50, 50]), np.array([80, 255, 255]))],
+        "cyan":   [(np.array([80, 50, 50]), np.array([100, 255, 255]))],
+        "blue":   [(np.array([100, 50, 50]), np.array([110, 255, 255]))],
+        "purple": [(np.array([110, 50, 50]), np.array([150, 255, 255]))],
     }
 
     detected_circles = []
@@ -52,7 +54,7 @@ def detect_colored_balls(frame):
         
         circularity = (4 * np.pi * area) / (perimeter ** 2)
 
-        if circularity < 0.75: continue # Ignore non-round objects
+        if circularity < 0.6: continue # Ignore non-round objects
 
         ((x, y), radius) = cv2.minEnclosingCircle(cnt)
         
@@ -82,8 +84,10 @@ def detect_colored_balls(frame):
 
                 # Drawing on original frame
                 cv2.circle(frame, (orig_x, orig_y), orig_r, (0, 255, 0), 2)
-                cv2.putText(frame, f"{detected_color}, {radius}", (orig_x, orig_y - orig_r), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                cv2.putText(frame, f"{detected_color}, {id}", (orig_x, orig_y - orig_r), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 4)
+                cv2.putText(frame, f"{detected_color}, {id}", (orig_x, orig_y - orig_r), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
 
     return detected_circles, frame
 
