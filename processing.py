@@ -4,18 +4,14 @@ import numpy as np
 import cv2
 import numpy as np
 
-TAG_SIZE_MM = 26.2
+TAG_SIZE_MM = 52
+CIRCULARITY_THRESH = 0.75
+
+
 
 def detect_colored_balls(frame):
-
-
-    # Downscale for speed (e.g., to 480p width)
-    # scale = 640 / frame.shape[1]
-    scale = 1
-    # small_frame = cv2.resize(frame, (0, 0), fx=scale, fy=scale)
-    
     # Blurring & HSV (Only done once)
-    # blurred = cv2.GaussianBlur(frame, (5, 5), 0)
+    # blurred = cv2.GaussianBlur(frame, (7, 7), 0)
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
     # Simplified color ranges for lookup
@@ -54,14 +50,13 @@ def detect_colored_balls(frame):
         
         circularity = (4 * np.pi * area) / (perimeter ** 2)
 
-        if circularity < 0.6: continue # Ignore non-round objects
+        if circularity < CIRCULARITY_THRESH: continue # Ignore non-round objects
 
         ((x, y), radius) = cv2.minEnclosingCircle(cnt)
         
         if radius > 5:
             # Classify color by sampling the center pixel in HSV
-            # This replaces the loop-per-color logic
-            cx, cy = int(x), int(y)
+            cx, cy, cr = int(x), int(y), int(radius)
             sample_pixel = hsv[cy, cx]
             
             detected_color = "unknown"
@@ -71,30 +66,27 @@ def detect_colored_balls(frame):
                         detected_color = name
                         break
             
-            if detected_color != "unknown":
-                # Rescale coordinates back to original size
-                orig_x, orig_y, orig_r = int(x/scale), int(y/scale), int(radius/scale)
-                
-                detected_circles.append({
-                    "color": detected_color,
-                    "x": orig_x, "y": orig_y, "radius": orig_r, "id": id
-                })
-                
-                id += 1
-
-                # Drawing on original frame
-                cv2.circle(frame, (orig_x, orig_y), orig_r, (0, 255, 0), 2)
-                cv2.putText(frame, f"{detected_color}, {id}", (orig_x, orig_y - orig_r), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 4)
-                cv2.putText(frame, f"{detected_color}, {id}", (orig_x, orig_y - orig_r), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
+            if detected_color == "unknown": 
+                continue
+            
+            detected_circles.append({
+                "color": detected_color,
+                "x": cx, "y": cy, "radius": cr, "id": id
+            })
+            # Drawing on original frame
+            cv2.circle(frame, (cx, cy), cr, (0, 255, 0), 2)
+            cv2.putText(frame, f"{detected_color}, {id}", (cx, cy - cr), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 4)
+            cv2.putText(frame, f"{detected_color}, {id}", (cx, cy - cr), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
+            id += 1
 
     return detected_circles, frame
 
 
 
 def get_relative_pos(ball_pixel_coords, tag_corners):
-    # 1. Define the real-world coordinates of the tag corners (in mm)
+    # Define the real-world coordinates of the tag corners (in mm)
     # Assuming tag is centered at (0,0), corners are half-size away
     s = TAG_SIZE_MM / 2
     # Order: Top-Left, Top-Right, Bottom-Right, Bottom-Left
@@ -103,15 +95,15 @@ def get_relative_pos(ball_pixel_coords, tag_corners):
         [ s, -s], [-s, -s]
     ], dtype=np.float32)
 
-    # 2. Get the detected pixel corners from AprilTag
+    # Get the detected pixel corners from AprilTag
     # Ensure tag_corners is shaped (4, 2)
     pixel_pts = tag_corners.reshape(4, 2).astype(np.float32)
 
-    # 3. Calculate the Homography Matrix
+    # Calculate the Homography Matrix
     # This matrix 'M' translates any pixel (u, v) on that plane to real (x, y)
     M, _ = cv2.findHomography(pixel_pts, world_pts)
 
-    # 4. Transform the ball pixel coordinate
+    # Transform the ball pixel coordinate
     ball_pt = np.array([[ball_pixel_coords]], dtype=np.float32)
     real_world_pt = cv2.perspectiveTransform(ball_pt, M)
 

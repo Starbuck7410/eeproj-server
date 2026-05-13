@@ -8,8 +8,11 @@ import time
 from processing import detect_colored_balls, get_relative_pos
 
 app = Flask(__name__)
-ROLL_AVG_N = 5
-
+ROLL_AVG_N = 10
+ROBOT_TAG_ID = 30
+BASKET_TAG_ID = 69
+BIG = 10000
+JUMP_THRESHOLD_MM = 200
 # AprilTag Detector
 aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_APRILTAG_36h11)
 aruco_params = cv2.aruco.DetectorParameters()
@@ -35,6 +38,11 @@ arr_basket_y = np.zeros(ROLL_AVG_N)
 
 basket_i = 0
 garbage_i = 0
+
+
+def dist(x, y):
+    return x ** 2 + y ** 2
+
 
 def avg_garbage(x, y):
     global garbage_i
@@ -85,10 +93,21 @@ def process_stream():
         corners, ids, rejected = detector.detectMarkers(real_frame)
         if(ids is not None):
             cv2.aruco.drawDetectedMarkers(frame, corners, ids)
-            if(len(detections) > 0):
-                garbage_x, garbage_y = get_relative_pos((detections[0]["x"], detections[0]["y"]) , corners[0])
-                garbage_x, garbage_y = avg_garbage(garbage_x, garbage_y)
-                print(f"Garbage at: {garbage_x:.2f}, {garbage_y:.2f}")
+            idx = np.where(ids.flatten() == ROBOT_TAG_ID)[0]
+            min_x, min_y, new_x, new_y = BIG, BIG, BIG, BIG
+            garbage_id = 0
+            if(len(detections) > 0 and len(idx) > 0):
+                idx = idx[0]
+                for detection in detections:
+                    new_x, new_y = get_relative_pos((detection["x"], detection["y"]), corners[idx])
+                    if(dist(new_x, new_y) < dist(min_x, min_y)):
+                        min_x, min_y = new_x, new_y
+                        garbage_id = id
+                
+                # This if statment is breaking things, but I will leave it here for future reference as it is not a bad idea
+                # if(dist(min_x - garbage_x, min_y - garbage_y) < JUMP_THRESHOLD_MM or garbage_x == 0 or garbage_y == 0): 
+                garbage_x, garbage_y = avg_garbage(min_x, min_y)
+                print(f"Garbage of id {garbage_id} at: {garbage_x:.2f}, {garbage_y:.2f}")
         
         # FPS calculation
         curr_time = time.time()
