@@ -83,7 +83,17 @@ def detect_colored_balls(frame):
 
     return detected_circles, frame
 
-
+def get_tag_center(tag_corners):
+    """
+    Returns the center pixel coordinate of an AprilTag.
+    
+    tag_corners format:
+    [[x1, y1], [x2, y2],
+     [x3, y3], [x4, y4]]
+    """
+    corners = tag_corners.reshape(4, 2)
+    center = np.mean(corners, axis=0)
+    return center
 
 def get_relative_pos(ball_pixel_coords, tag_corners):
     # Define the real-world coordinates of the tag corners (in mm)
@@ -111,4 +121,41 @@ def get_relative_pos(ball_pixel_coords, tag_corners):
     rel_x = real_world_pt[0][0][0]
     rel_y = real_world_pt[0][0][1]
     
+    return (round(rel_x, 2), round(rel_y, 2))
+
+
+def get_relative_pos_between_tags(reference_tag_corners, target_tag_corners):
+    """
+    Computes the relative position of one tag with respect to another tag.
+
+    Returns:
+        (rel_x_mm, rel_y_mm)
+    """
+
+    # Real-world coordinates of the reference tag corners
+    s = TAG_SIZE_MM / 2
+
+    # Corner order:
+    # Top-Left, Top-Right, Bottom-Right, Bottom-Left
+    world_pts = np.array([
+        [-s,  s], [ s,  s],
+        [ s, -s], [-s, -s]
+    ], dtype=np.float32)
+
+    # Reference tag pixel corners
+    ref_pixel_pts = reference_tag_corners.reshape(4, 2).astype(np.float32)
+
+    # Homography from image -> reference tag coordinate system
+    M, _ = cv2.findHomography(ref_pixel_pts, world_pts)
+
+    # Get center of target tag in pixel coordinates
+    target_center = get_tag_center(target_tag_corners)
+
+    # Transform target center into reference tag world coordinates
+    target_pt = np.array([[target_center]], dtype=np.float32)
+    transformed_pt = cv2.perspectiveTransform(target_pt, M)
+
+    rel_x = transformed_pt[0][0][0]
+    rel_y = transformed_pt[0][0][1]
+
     return (round(rel_x, 2), round(rel_y, 2))

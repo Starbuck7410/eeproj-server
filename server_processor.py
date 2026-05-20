@@ -5,12 +5,12 @@ import numpy as np
 from flask import Flask, Response, render_template, jsonify
 import threading
 import time
-from processing import detect_colored_balls, get_relative_pos
+from processing import detect_colored_balls, get_relative_pos, get_relative_pos_between_tags
 
 app = Flask(__name__)
 ROLL_AVG_N = 10
 ROBOT_TAG_ID = 30
-BASKET_TAG_ID = 69
+BASKET_TAG_ID = 5
 BIG = 10000
 JUMP_THRESHOLD_MM = 200
 # AprilTag Detector
@@ -29,6 +29,7 @@ basket_x = 0
 basket_y = 0
 garbage_x = 0
 garbage_y = 0
+garbage_id = 0
 
 
 arr_garbage_x = np.zeros(ROLL_AVG_N)
@@ -67,7 +68,7 @@ def avg_basket(x, y):
 
 
 def process_stream():
-    global output_frame, fps, lock, resolution, rpi_name, online, basket_x, basket_y, garbage_x, garbage_y
+    global output_frame, fps, lock, resolution, rpi_name, online, basket_x, basket_y, garbage_x, garbage_y, garbage_id
     image_hub = imagezmq.ImageHub()
     image_hub.zmq_socket.setsockopt(zmq.RCVTIMEO, 3000)
     prev_time = time.time()
@@ -93,21 +94,26 @@ def process_stream():
         corners, ids, rejected = detector.detectMarkers(real_frame)
         if(ids is not None):
             cv2.aruco.drawDetectedMarkers(frame, corners, ids)
-            idx = np.where(ids.flatten() == ROBOT_TAG_ID)[0]
+            robot_tag_idx = np.where(ids.flatten() == ROBOT_TAG_ID)[0]
+            basket_tag_idx = np.where(ids.flatten() == BASKET_TAG_ID)[0] 
             min_x, min_y, new_x, new_y = BIG, BIG, BIG, BIG
-            garbage_id = 0
-            if(len(detections) > 0 and len(idx) > 0):
-                idx = idx[0]
+            if(len(detections) > 0 and len(robot_tag_idx) > 0):
                 for detection in detections:
-                    new_x, new_y = get_relative_pos((detection["x"], detection["y"]), corners[idx])
+                    new_x, new_y = get_relative_pos((detection["x"], detection["y"]), corners[robot_tag_idx[0]])
                     if(dist(new_x, new_y) < dist(min_x, min_y)):
                         min_x, min_y = new_x, new_y
                         garbage_id = id
-                
+
                 # This if statment is breaking things, but I will leave it here for future reference as it is not a bad idea
                 # if(dist(min_x - garbage_x, min_y - garbage_y) < JUMP_THRESHOLD_MM or garbage_x == 0 or garbage_y == 0): 
                 garbage_x, garbage_y = avg_garbage(min_x, min_y)
-                print(f"Garbage of id {garbage_id} at: {garbage_x:.2f}, {garbage_y:.2f}")
+                # print(f"Garbage of id {garbage_id} at: {garbage_x:.2f}, {garbage_y:.2f}")
+
+            if(len(robot_tag_idx) > 0 and len (basket_tag_idx) > 0):
+                new_x, new_y = get_relative_pos_between_tags(corners[robot_tag_idx[0]], corners[basket_tag_idx[0]])
+                basket_x, basket_y = avg_garbage(new_x, new_y)
+
+                
         
         # FPS calculation
         curr_time = time.time()
@@ -141,15 +147,15 @@ def garbage():
     target = {
         "x": float(garbage_x / 1000),
         "y": float(garbage_y / 1000),
-        "z": 0
+        "z": 0,
     }
     return jsonify(target)
 
 @app.route("/api/basket")
 def basket():
     target = {
-        "x": float(basket_x),
-        "y": float(basket_y),
+        "x": float(basket_x / 1000),
+        "y": float(basket_y / 1000),
         "z": 0
     }
     return jsonify(target)
@@ -160,7 +166,8 @@ def frame_stats():
         "fps": fps,
         "resolution": f"{resolution[0]} ⨯ {resolution[1]}",
         "online": online,
-        "device_name": rpi_name
+        "device_name": rpi_name,
+        "garbage_id": garbage_id
     }
     return jsonify(stats)
 
