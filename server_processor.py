@@ -12,7 +12,7 @@ ROLL_AVG_N = 10
 ROBOT_TAG_ID = 30
 BASKET_TAG_ID = 5
 BIG = 10000
-JUMP_THRESHOLD_MM = 200
+# JUMP_THRESHOLD_MM = 200
 # AprilTag Detector
 aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_APRILTAG_36h11)
 aruco_params = cv2.aruco.DetectorParameters()
@@ -85,7 +85,8 @@ def process_stream():
         online = True
         frame = cv2.imdecode(np.frombuffer(jpg_buffer, dtype=np.uint8), cv2.IMREAD_COLOR)
         real_frame = frame.copy()
-        resolution = frame.shape
+        with lock:
+            resolution = frame.shape
 
         # Detect balls
         detections, frame = detect_colored_balls(frame)
@@ -99,25 +100,30 @@ def process_stream():
             min_x, min_y, new_x, new_y = BIG, BIG, BIG, BIG
             if(len(detections) > 0 and len(robot_tag_idx) > 0):
                 for detection in detections:
+                    detection_id = detection["id"]
+                    # print(f'corners[robot_tag_idx[0]]: {corners[robot_tag_idx[0]]}')
                     new_x, new_y = get_relative_pos((detection["x"], detection["y"]), corners[robot_tag_idx[0]])
                     if(dist(new_x, new_y) < dist(min_x, min_y)):
                         min_x, min_y = new_x, new_y
-                        garbage_id = id
+                        garbage_id = detection_id
 
-                # This if statment is breaking things, but I will leave it here for future reference as it is not a bad idea
+                # This 'if' statment is breaking things, but I will leave it here for future reference as it is not a bad idea
                 # if(dist(min_x - garbage_x, min_y - garbage_y) < JUMP_THRESHOLD_MM or garbage_x == 0 or garbage_y == 0): 
-                garbage_x, garbage_y = avg_garbage(min_x, min_y)
+                with lock:
+                    garbage_x, garbage_y = avg_garbage(min_x, min_y)
                 # print(f"Garbage of id {garbage_id} at: {garbage_x:.2f}, {garbage_y:.2f}")
 
             if(len(robot_tag_idx) > 0 and len (basket_tag_idx) > 0):
                 new_x, new_y = get_relative_pos_between_tags(corners[robot_tag_idx[0]], corners[basket_tag_idx[0]])
-                basket_x, basket_y = avg_garbage(new_x, new_y)
+                with lock:
+                    basket_x, basket_y = avg_basket(new_x, new_y)
 
                 
         
         # FPS calculation
         curr_time = time.time()
-        fps = round(1 / (curr_time - prev_time), 1)
+        with lock:
+            fps = round(1 / (curr_time - prev_time), 1)
         prev_time = curr_time
         with lock:
             _, encoded_image = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 60])
@@ -144,30 +150,46 @@ def video_feed():
 
 @app.route("/api/garbage")
 def garbage():
+    with lock:
+        local_x = garbage_x
+        local_y = garbage_y
+
     target = {
-        "x": float(garbage_x / 1000),
-        "y": float(garbage_y / 1000),
+        "x": float(local_x / 1000),
+        "y": float(local_y / 1000),
         "z": 0,
     }
     return jsonify(target)
 
 @app.route("/api/basket")
 def basket():
+    with lock:
+        local_x = basket_x
+        local_y = basket_y
+
     target = {
-        "x": float(basket_x / 1000),
-        "y": float(basket_y / 1000),
-        "z": 0
+        "x": float(local_x / 1000),
+        "y": float(local_y / 1000),
+        "z": 0,
     }
     return jsonify(target)
 
 @app.route("/api/frame_stats")
 def frame_stats():
+    # print(f'Garbage ID: {garbage_id}')
+    with lock:
+        local_fps = fps
+        local_res = resolution
+        local_online = online
+        local_name = rpi_name
+        local_g_id = garbage_id
+
     stats = {
-        "fps": fps,
-        "resolution": f"{resolution[0]} ⨯ {resolution[1]}",
-        "online": online,
-        "device_name": rpi_name,
-        "garbage_id": garbage_id
+        "fps": local_fps,
+        "resolution": f"{local_res[0]} ⨯ {local_res[1]}" if len(local_res) > 1 else "0 ⨯ 0",
+        "online": local_online,
+        "device_name": local_name,
+        "garbage_id": local_g_id
     }
     return jsonify(stats)
 

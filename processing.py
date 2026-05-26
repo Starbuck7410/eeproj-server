@@ -40,12 +40,12 @@ def detect_colored_balls(frame):
 
     # Use Contours instead of HoughCircles (Much Faster)
     contours, _ = cv2.findContours(full_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    id = 0
+    detection_id = 0
     for cnt in contours:
         
         area = cv2.contourArea(cnt)
         perimeter = cv2.arcLength(cnt, True)
-        if area < 400:  # Filter noise
+        if area < 400 or perimeter == 0:  # Filter noise
             continue
         
         circularity = (4 * np.pi * area) / (perimeter ** 2)
@@ -71,15 +71,15 @@ def detect_colored_balls(frame):
             
             detected_circles.append({
                 "color": detected_color,
-                "x": cx, "y": cy, "radius": cr, "id": id
+                "x": cx, "y": cy, "radius": cr, "id": detection_id
             })
             # Drawing on original frame
             cv2.circle(frame, (cx, cy), cr, (0, 255, 0), 2)
-            cv2.putText(frame, f"{detected_color}, {id}", (cx, cy - cr), 
+            cv2.putText(frame, f"{detected_color}, {detection_id}", (cx, cy - cr), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 4)
-            cv2.putText(frame, f"{detected_color}, {id}", (cx, cy - cr), 
+            cv2.putText(frame, f"{detected_color}, {detection_id}", (cx, cy - cr), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
-            id += 1
+            detection_id += 1
 
     return detected_circles, frame
 
