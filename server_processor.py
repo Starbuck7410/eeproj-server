@@ -30,6 +30,8 @@ basket_y = 0
 garbage_x = 0
 garbage_y = 0
 garbage_id = 0
+garbage_valid = False
+basket_valid = False
 
 
 arr_garbage_x = np.zeros(ROLL_AVG_N)
@@ -68,7 +70,7 @@ def avg_basket(x, y):
 
 
 def process_stream():
-    global output_frame, fps, lock, resolution, rpi_name, online, basket_x, basket_y, garbage_x, garbage_y, garbage_id
+    global output_frame, fps, lock, resolution, rpi_name, online, basket_x, basket_y, garbage_x, garbage_y, garbage_id, basket_valid, garbage_valid
     image_hub = imagezmq.ImageHub()
     image_hub.zmq_socket.setsockopt(zmq.RCVTIMEO, 3000)
     prev_time = time.time()
@@ -110,13 +112,26 @@ def process_stream():
                 # This 'if' statment is breaking things, but I will leave it here for future reference as it is not a bad idea
                 # if(dist(min_x - garbage_x, min_y - garbage_y) < JUMP_THRESHOLD_MM or garbage_x == 0 or garbage_y == 0): 
                 with lock:
+                    garbage_valid = True
                     garbage_x, garbage_y = avg_garbage(min_x, min_y)
                 # print(f"Garbage of id {garbage_id} at: {garbage_x:.2f}, {garbage_y:.2f}")
+            else:
+                with lock:
+                    garbage_valid = False
 
+                
             if(len(robot_tag_idx) > 0 and len (basket_tag_idx) > 0):
                 new_x, new_y = get_relative_pos_between_tags(corners[robot_tag_idx[0]], corners[basket_tag_idx[0]])
                 with lock:
+                    basket_valid = True
                     basket_x, basket_y = avg_basket(new_x, new_y)
+            else: 
+                with lock:
+                    basket_valid = False
+        else:
+            with lock:
+                basket_valid = False
+                garbage_valid = False
 
                 
         
@@ -153,11 +168,11 @@ def garbage():
     with lock:
         local_x = garbage_x
         local_y = garbage_y
-
+        local_valid = garbage_valid
     target = {
         "x": float(local_x / 1000),
         "y": float(local_y / 1000),
-        "z": 0,
+        "valid": local_valid,
     }
     return jsonify(target)
 
@@ -166,11 +181,11 @@ def basket():
     with lock:
         local_x = basket_x
         local_y = basket_y
-
+        local_valid = basket_valid
     target = {
         "x": float(local_x / 1000),
         "y": float(local_y / 1000),
-        "z": 0,
+        "valid": local_valid,
     }
     return jsonify(target)
 

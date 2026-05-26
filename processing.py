@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 
 TAG_SIZE_MM = 52
-CIRCULARITY_THRESH = 0.75
+CIRCULARITY_THRESH = 0.69
 
 
 
@@ -16,14 +16,14 @@ def detect_colored_balls(frame):
 
     # Simplified color ranges for lookup
     color_ranges = {
-        "red":    [(np.array([0, 50, 50]), np.array([10, 255, 255])),
-                   (np.array([150, 50, 50]), np.array([180, 255, 255]))],
-        "orange": [(np.array([10, 70, 70]), np.array([20, 255, 255]))],
-        "yellow": [(np.array([20, 50, 50]), np.array([40, 255, 255]))],
-        "green":  [(np.array([40, 50, 50]), np.array([80, 255, 255]))],
-        "cyan":   [(np.array([80, 50, 50]), np.array([100, 255, 255]))],
-        "blue":   [(np.array([100, 50, 50]), np.array([110, 255, 255]))],
-        "purple": [(np.array([110, 50, 50]), np.array([150, 255, 255]))],
+        "red":    [(np.array([0,   100, 100]), np.array([10,  255, 255])),
+                   (np.array([150, 100, 100]), np.array([180, 255, 255]))],
+        "orange": [(np.array([10,  100, 100]), np.array([20,  255, 255]))],
+        "yellow": [(np.array([20,  100, 100]), np.array([40,  255, 255]))],
+        "green":  [(np.array([40,  100, 100]), np.array([80,  255, 255]))],
+        "cyan":   [(np.array([80,  150, 200]), np.array([100, 255, 255]))],
+        "blue":   [(np.array([100, 100, 100]), np.array([110, 255, 255]))],
+        "purple": [(np.array([110, 100, 100 ]), np.array([150, 255, 255]))],
     }
 
     detected_circles = []
