@@ -1,4 +1,4 @@
-# Vision Server & Dashboard
+# OUTDATED README PLEASE DO NOT FOLLOW THESE INSTRUCTIONS
 
 This server receives compressed video from a Raspberry Pi, performs YOLOv8 object detection and AprilTag 3D tracking, and hosts a web dashboard.
 
