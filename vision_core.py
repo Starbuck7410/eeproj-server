@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import config
-
+import math
 
 
 
@@ -16,7 +16,7 @@ def detect_colored_balls(frame):
                    (np.array([150, 100, 100]), np.array([180, 255, 255]))],
         "orange": [(np.array([10,  100, 100]), np.array([20,  255, 255]))],
         "yellow": [(np.array([20,  100, 100]), np.array([40,  255, 255]))],
-        "green":  [(np.array([40,  100, 100]), np.array([80,  255, 255]))],
+        "green":  [(np.array([40,  70,  100]), np.array([80,  200, 255]))],
         "cyan":   [(np.array([80,  150, 200]), np.array([100, 255, 255]))],
         "blue":   [(np.array([100, 100, 100]), np.array([110, 255, 255]))],
         "purple": [(np.array([110, 100, 100]), np.array([150, 180, 180]))],
@@ -91,10 +91,10 @@ def get_tag_center(tag_corners):
     center = np.mean(corners, axis=0)
     return center
 
-def get_relative_pos(ball_pixel_coords, tag_corners):
+def get_relative_pos(tag_corners, ball_pixel_coords, ref_size):
     # Define the real-world coordinates of the tag corners (in mm)
     # Assuming tag is centered at (0,0), corners are half-size away
-    s = config.TAG_SIZE_MM / 2
+    s = ref_size / 2
     # Order: Top-Left, Top-Right, Bottom-Right, Bottom-Left
     world_pts = np.array([
         [-s,  s], [ s,  s], 
@@ -120,26 +120,29 @@ def get_relative_pos(ball_pixel_coords, tag_corners):
     return (round(rel_x, 2), round(rel_y, 2))
 
 
-def get_relative_pos_between_tags(reference_tag_corners, target_tag_corners):
+import numpy as np
+import cv2
+import math
+
+def get_relative_pos_between_tags(reference_tag_corners, target_tag_corners, ref_size = 50.0):
     """
-    Computes the relative position of one tag with respect to another tag.
+    Computes the relative position of one tag with respect to another tag
+    using homography and perspective transformation for both position and yaw.
 
     Returns:
-        (rel_x_mm, rel_y_mm)
+        (rel_x_mm, rel_y_mm, rel_yaw_deg)
     """
-    # print(f'Reference corners: {reference_tag_corners}, Target corners: {target_tag_corners}')
-    # Real-world coordinates of the reference tag corners
-    s = config.TAG_SIZE_MM / 2
+    s = ref_size / 2
 
-    # Corner order:
-    # Top-Left, Top-Right, Bottom-Right, Bottom-Left
+    # Corner order: Top-Left, Top-Right, Bottom-Right, Bottom-Left
     world_pts = np.array([
         [-s,  s], [ s,  s],
         [ s, -s], [-s, -s]
     ], dtype=np.float32)
 
-    # Reference tag pixel corners
+    # Reference and target tag pixel corners
     ref_pixel_pts = reference_tag_corners.reshape(4, 2).astype(np.float32)
+    target_pixel_pts = target_tag_corners.reshape(4, 2).astype(np.float32)
 
     # Homography from image -> reference tag coordinate system
     M, _ = cv2.findHomography(ref_pixel_pts, world_pts)
@@ -147,11 +150,36 @@ def get_relative_pos_between_tags(reference_tag_corners, target_tag_corners):
     # Get center of target tag in pixel coordinates
     target_center = get_tag_center(target_tag_corners)
 
-    # Transform target center into reference tag world coordinates
-    target_pt = np.array([[target_center]], dtype=np.float32)
-    transformed_pt = cv2.perspectiveTransform(target_pt, M)
+    # Batch the points to transform: [Center, Top-Left, Top-Right]
+    # This minimizes calls to cv2.perspectiveTransform
+    pts_to_transform = np.array([
+        target_center,
+        target_pixel_pts[0],  # Top-Left (TL)
+        target_pixel_pts[1]   # Top-Right (TR)
+    ], dtype=np.float32).reshape(-1, 1, 2)
 
-    rel_x = transformed_pt[0][0][0]
-    rel_y = transformed_pt[0][0][1]
+    # Transform all points into the reference tag's world coordinates
+    transformed_pts = cv2.perspectiveTransform(pts_to_transform, M)
 
-    return (round(rel_x, 2), round(rel_y, 2))
+    # Extract relative position
+    rel_x = transformed_pts[0][0][0]
+    rel_y = transformed_pts[0][0][1]
+
+    # Extract target orientation vector in the world frame
+    world_tl = transformed_pts[1][0]
+    world_tr = transformed_pts[2][0]
+    world_vec = world_tr - world_tl
+
+    # Calculate yaw directly in the reference tag's world coordinate system
+    # (Since the reference frame's X-axis is aligned at 0 radians, this angle IS the relative yaw)
+    rel_yaw_rad = math.atan2(world_vec[1], world_vec[0])
+    rel_yaw = math.degrees(rel_yaw_rad)
+
+    # Normalize to [-180, 180]
+    rel_yaw = (rel_yaw + 180) % 360 - 180
+
+    return (
+        round(rel_x, 2),
+        round(rel_y, 2),
+        round(rel_yaw, 2)
+    )

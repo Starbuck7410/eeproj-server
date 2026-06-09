@@ -7,6 +7,9 @@ import secrets
 import shared_state as state
 import config
 from processing import process_stream
+import socket
+
+
 
 # Stop the annoying log messages
 import logging
@@ -98,9 +101,40 @@ def frame_stats():
     }
     return jsonify(stats)
 
+
+@app.route("/api/set_battery", methods=["POST"])
+def set_battery():
+    data = request.get_json(silent=True) or {}
+
+    battery = data.get("battery")
+    if battery is None:
+        return jsonify({"error": "battery field required"}), 400
+
+    with state.lock:
+        state.battery = battery
+
+    return jsonify({
+        "success": True,
+        "battery": battery
+    })
+
+
+@app.route("/api/get_battery")
+def get_battery():
+    with state.lock:
+        battery = state.battery
+
+    return jsonify({
+        "battery": battery
+    })
+
 if __name__ == "__main__":
     process_thread = threading.Thread(target=process_stream, daemon=True)
     process_thread.start()
+    hostname = socket.gethostname()
+    print("Login at:")
+    print(f"http://127.0.0.1:{config.PORT}")
+    print(f"http://{socket.gethostbyname(hostname)}:{config.PORT}")
     app.run(host=config.HOST, port=config.PORT, threaded=True, debug=False)
     
 

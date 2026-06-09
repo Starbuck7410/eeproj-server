@@ -60,6 +60,14 @@
         } catch (error) {
             console.error('Failed to fetch basket location:', error);
         }
+
+        try {
+            const response = await fetch('/api/get_battery');
+            const data = await response.json();
+            document.getElementById('robot-battery-val').textContent = data.battery;
+        } catch (error) {
+            console.error('Failed to fetch robot battery percentage:', error);
+        }
     }
 
     // Update immediately
@@ -103,6 +111,13 @@
                     <h6 class="text-uppercase text-muted small fw-bold mb-3">Garbage ID</h6>
                     <div class="d-flex justify-content-between align-items-center">
                         <span class="h4 mb-0" id="garbage-id-val">0</span>
+                    </div>
+                </div>
+                <div class="card stat-card p-3 mb-3">
+                    <h6 class="text-uppercase text-muted small fw-bold mb-3">Robots Battery</h6>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="h4 mb-0" id="robot-battery-val">Unknown</span>
+                        <span class="badge bg-secondary">%</span>
                     </div>
                 </div>
                 <div class="card stat-card p-3 mb-3">

@@ -12,7 +12,7 @@ online = False
 basket_loc = Location(config.ROLL_AVG_N, jump_threshold = config.JUMP_THRESHOLD_MM, persistence_threshold = config.PERSISTENCE)
 garbage_loc = Location(config.ROLL_AVG_N, jump_threshold = config.JUMP_THRESHOLD_MM, persistence_threshold = config.PERSISTENCE)
 garbage_id = 0
-
+battery = "Unknown"
 
 basket_i = 0
 garbage_i = 0
