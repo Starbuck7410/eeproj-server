@@ -20,14 +20,16 @@ detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
 def dist(x, y):
     return x ** 2 + y ** 2
 
-def get_closest_object_3(detections, target_corners, ref_corners):
+def get_closest_object_3(detections, target_corners, ref_corners, min_dist_from_ref = config.BASKET_TAG_SIZE_MM):
     min_x, min_y, min_id = config.BIG, config.BIG, -1
     for detection in detections:
         detection_id = detection["id"]
         robot_x, robot_y, _ = get_relative_pos_between_tags(ref_corners, target_corners, ref_size=config.BASKET_TAG_SIZE_MM)
         ball_x, ball_y = get_relative_pos(ref_corners, (detection["x"], detection["y"]), ref_size=config.BASKET_TAG_SIZE_MM)
+        if(dist(ball_x, ball_y) < min_dist_from_ref ** 2):
+            continue
         new_x, new_y = vec_sub((ball_x, ball_y), (robot_x, robot_y))
-        if(dist(new_x, new_y) < dist(min_x, min_y)):
+        if(dist(new_x - config.ROBOT_SIZE_X, new_y) < dist(min_x - config.ROBOT_SIZE_X, min_y)):
             min_x, min_y = new_x, new_y
             min_id = detection_id
 
@@ -39,7 +41,7 @@ def get_closest_object(detections, target_corners):
     for detection in detections:
         detection_id = detection["id"]
         new_x, new_y = get_relative_pos(target_corners, (detection["x"], detection["y"]), ref_size=config.ROBOT_TAG_SIZE_MM)
-        if(dist(new_x, new_y) < dist(min_x, min_y)):
+        if(dist(new_x - config.ROBOT_SIZE_X, new_y) < dist(min_x - config.ROBOT_SIZE_X, min_y)):
             min_x, min_y = new_x, new_y
             min_id = detection_id
     return min_x, min_y, min_id
@@ -68,33 +70,32 @@ def process_stream():
     image_hub = imagezmq.ImageHub()
     image_hub.zmq_socket.setsockopt(zmq.RCVTIMEO, 1000)
     prev_time = time.time()
-    online = False
     while True:
         try:
             state.rpi_name, jpg_buffer = image_hub.recv_jpg()
+            # state.rpi_name, frame = image_hub.recv_image()
         except zmq.error.Again:
             sys.stdout.write("\033[F") # Cursor up
             sys.stdout.write("\033[K") # Clear line
             sys.stdout.write("\033[31m") # Red
             print(f"Offline: No video data received for {int(time.time() - prev_time)} seconds.")
             sys.stdout.write("\033[0m") 
-            online = False
+            with state.lock:
+                state.online = False
             continue
         
         image_hub.send_reply(b'OK')
         
-        if(not online):
-            sys.stdout.write("\033[F") 
-            sys.stdout.write("\033[K") 
-            sys.stdout.write("\033[32m") # Green
-            print("Online!")
-            sys.stdout.write("\033[0m") 
-            online = True
+        sys.stdout.write("\033[F") 
+        sys.stdout.write("\033[K") 
+        sys.stdout.write("\033[32m") # Green
+        print("Online!")
+        sys.stdout.write("\033[0m") 
         frame = cv2.imdecode(np.frombuffer(jpg_buffer, dtype=np.uint8), cv2.IMREAD_COLOR)
         real_frame = frame.copy()
-
+        
         with state.lock:
-            state.online = online
+            state.online = True
             state.resolution = frame.shape
 
         # Detect balls

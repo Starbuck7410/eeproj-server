@@ -9,8 +9,8 @@ fps = 0
 resolution = (0, 0)
 rpi_name = ""
 online = False
-basket_loc = Location(config.ROLL_AVG_N, jump_threshold = config.JUMP_THRESHOLD_MM, persistence_threshold = config.PERSISTENCE)
-garbage_loc = Location(config.ROLL_AVG_N, jump_threshold = config.JUMP_THRESHOLD_MM, persistence_threshold = config.PERSISTENCE)
+basket_loc = Location(config.ROLL_AVG_N, jump_threshold = config.JUMP_THRESHOLD_MM, persistence_threshold = config.PERSISTENCE, invalidate_counter_max = config.MAX_INVALIDATE)
+garbage_loc = Location(config.ROLL_AVG_N, jump_threshold = config.JUMP_THRESHOLD_MM, persistence_threshold = config.PERSISTENCE, invalidate_counter_max = config.MAX_INVALIDATE)
 garbage_id = 0
 battery = "Unknown"
 

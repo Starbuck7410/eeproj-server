@@ -12,14 +12,13 @@ def detect_colored_balls(frame):
 
     # Simplified color ranges for lookup
     color_ranges = {
-        "red":    [(np.array([0,   100, 100]), np.array([10,  255, 255])),
-                   (np.array([150, 100, 100]), np.array([180, 255, 255]))],
-        "orange": [(np.array([10,  100, 100]), np.array([20,  255, 255]))],
-        "yellow": [(np.array([20,  100, 100]), np.array([40,  255, 255]))],
-        "green":  [(np.array([40,  70,  100]), np.array([80,  200, 255]))],
-        "cyan":   [(np.array([80,  150, 200]), np.array([100, 255, 255]))],
-        "blue":   [(np.array([100, 100, 100]), np.array([110, 255, 255]))],
-        "purple": [(np.array([110, 100, 100]), np.array([150, 180, 180]))],
+        "red":    [(np.array([0,   150, 100]), np.array([10,  255, 200])),
+                   (np.array([140, 150, 100]), np.array([180, 255, 200]))],
+        "orange": [(np.array([10,  100, 100]), np.array([20,  255, 220]))],
+        "green":  [(np.array([40,  70,  100]), np.array([80,  200, 220]))],
+        "cyan":   [(np.array([80,  180, 80 ]), np.array([115, 255, 170]))],
+        "blue":   [(np.array([80 , 100, 100]), np.array([115, 255, 220]))],
+        "purple": [(np.array([115, 110, 50 ]), np.array([140, 200, 130]))],
     }
 
     detected_circles = []
@@ -41,7 +40,7 @@ def detect_colored_balls(frame):
         
         area = cv2.contourArea(cnt)
         perimeter = cv2.arcLength(cnt, True)
-        if area < config.MIN_AERA or perimeter == 0:  # Filter noise
+        if area < config.MIN_AERA or area > config.MAX_AREA or perimeter == 0:  # Filter noise
             continue
         
         circularity = (4 * np.pi * area) / (perimeter ** 2)
@@ -50,7 +49,7 @@ def detect_colored_balls(frame):
 
         ((x, y), radius) = cv2.minEnclosingCircle(cnt)
         
-        if radius > 5:
+        if radius > 2:
             # Classify color by sampling the center pixel in HSV
             cx, cy, cr = int(x), int(y), int(radius)
             sample_pixel = hsv[cy, cx]

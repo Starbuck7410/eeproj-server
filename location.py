@@ -2,7 +2,7 @@ import numpy as np
 
 class Location:
 
-    def __init__(self, size = 20, jump_threshold = 20.0, persistence_threshold = 15, cluster_radius = 15.0):
+    def __init__(self, size = 20, jump_threshold = 20.0, persistence_threshold = 15, cluster_radius = 15.0, invalidate_counter_max = 3):
         coords = np.dtype([('x', 'f4'), ('y', 'f4')])
         self.size = size
         self.jump_threshold = jump_threshold
@@ -13,6 +13,8 @@ class Location:
         self.coords = (0, 0)
         self.outlier_buffer = []              # Replaced integer counter with a list buffer
         self.arr_idx = 0
+        self.invalidate_counter = 0
+        self.invalidate_counter_max = invalidate_counter_max
 
     def update(self, new_coords):
         """
@@ -29,13 +31,13 @@ class Location:
             # Signal is close enough; normal tracking behavior
             self.outlier_buffer.clear()  # Clear transient noise spikes
             self._push_to_buffer(new_x, new_y)
-            self.coords_valid = True
+            self.validate()
         else:
             # Signal jumped too far. Accumulate sample points for voting
             self.outlier_buffer.append((new_x, new_y))
             
             if len(self.outlier_buffer) >= self.persistence_threshold:
-                self.coords_valid = True
+                self.validate()
                 # Confirmed target shift: Find the densest cluster among the samples
                 best_x, best_y = self._get_densest_sample()
                 self._reset_buffer(best_x, best_y)
@@ -46,8 +48,16 @@ class Location:
         return self.coords
 
     def invalidate(self):
-        self.coords_valid = False
-        self.outlier_buffer.clear()
+        if(self.invalidate_counter < self.invalidate_counter_max):
+            self.invalidate_counter += 1
+        else:
+            self.invalidate_counter = 0
+            self.coords_valid = False
+            self.outlier_buffer.clear()
+
+    def validate(self):
+        self.invalidate_counter = 0
+        self.coords_valid = True
 
     def _push_to_buffer(self, x, y):
         self.arr_coords[self.arr_idx] = (x, y)
