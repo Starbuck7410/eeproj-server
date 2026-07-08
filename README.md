@@ -34,7 +34,7 @@ To prevent erratic movements in reported data (e.g., from lighting changes or oc
 *   Requires a `persistence_threshold` of consecutive valid samples before validating a new location.
 *   Uses an invalidation counter to reset/clear coordinates if tracking is lost, ensuring high data integrity for downstream tasks (like robot navigation).
 
-## 🚀 Setup and Execution
+## Setup and Execution
 
 ### Prerequisites
 *   Python 3
